@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kc
+      POSTGRES_PASSWORD: kc
+      POSTGRES_DB: kc
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://kc:kc@db:5432/kc
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: ./backend
+    command: celery -A app.workers.celery_app.celery_app worker --loglevel=info
+    environment:
+      DATABASE_URL: postgresql+psycopg2://kc:kc@db:5432/kc
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:3000
+    depends_on:
+      - db
+      - redis
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
